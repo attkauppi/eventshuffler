@@ -30,3 +30,61 @@ jobs:
         with:
           name: coverage-report
           path: coverage
+
+  database-e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: eventshuffle
+        ports:
+          - 5588:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d eventshuffle"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_HOST: localhost
+      DATABASE_PORT: 5588
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: eventshuffle
+      DATABASE_SCHEMA: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Prepare database
+        env:
+          PGPASSWORD: ${{ env.DATABASE_PASSWORD }}
+        run: |
+          until pg_isready -h "$DATABASE_HOST" -p "$DATABASE_PORT" -U "$DATABASE_USER" -d "$DATABASE_NAME"; do
+            sleep 1
+          done
+
+          psql -h "$DATABASE_HOST" -p "$DATABASE_PORT" -U "$DATABASE_USER" -d "$DATABASE_NAME" -v ON_ERROR_STOP=1 <<'SQL'
+          create schema if not exists test;
+          create extension if not exists "uuid-ossp";
+          SQL
+
+      - name: Run database e2e test
+        run: npm run test:e2e -- --runInBand test/database.e2e-spec.ts
