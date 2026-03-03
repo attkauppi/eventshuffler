@@ -16,17 +16,4 @@ const dataSourceOptions: DataSourceOptions = {
   synchronize: false,
 };
 
-const shouldDebugDbConfig =
-  process.env.DEBUG_DB_CONFIG === '1' ||
-  process.env.DEBUG_DB_CONFIG?.toLowerCase() === 'true';
-
-if (shouldDebugDbConfig) {
-  const sanitizedOptions = {
-    ...dataSourceOptions,
-    password: dataSourceOptions.password ? '***' : dataSourceOptions.password,
-  };
-
-  console.log('[db] DataSource config:', sanitizedOptions);
-}
-
 export default new DataSource(dataSourceOptions);
